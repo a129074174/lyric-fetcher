@@ -54,6 +54,35 @@ if "!REMOTE!"=="" (
   echo [push] remote : !REMOTE!
 )
 
+rem ---------- 3b. remote URL sanity check ----------
+rem A bare "owner/repo" (as shown on the GitHub web page) is NOT a valid
+rem repository URL - git reads it as a local path and push always fails.
+rem Detect that shape and upgrade it to a real URL automatically.
+
+set "RURL="
+for /f "delims=" %%i in ('git config --get remote.!REMOTE!.url 2^>nul') do set "RURL=%%i"
+
+if not defined RURL goto :url_ok
+
+echo !RURL! | findstr /c:"/" >nul
+if errorlevel 1 goto :url_ok
+echo !RURL! | findstr /c:"://" >nul
+if not errorlevel 1 goto :url_ok
+echo !RURL! | findstr /c:"@" >nul
+if not errorlevel 1 goto :url_ok
+echo !RURL! | findstr /c:":" >nul
+if not errorlevel 1 goto :url_ok
+if "!RURL:~0,1!"=="." goto :url_ok
+if "!RURL:~0,1!"=="/" goto :url_ok
+
+echo [push] WARNING: "!RURL!" is not a usable repository URL -
+echo [push]          git reads it as a local path, so push would always fail.
+set "RURL=https://github.com/!RURL!.git"
+git remote set-url !REMOTE! "!RURL!"
+echo [push]          auto-fixed to: !RURL!
+
+:url_ok
+
 rem ---------- 4. branch ----------
 
 set "BRANCH="
@@ -104,10 +133,11 @@ if errorlevel 1 (
 
 if errorlevel 1 (
   echo.
-  echo [FAILED] push rejected.
-  echo          if this is a non-fast-forward, run:
-  echo            git pull --rebase
-  echo          then run this script again.
+  echo [FAILED] push rejected. usual causes:
+  echo   1^) remote URL is wrong   -^> check:  git remote -v
+  echo   2^) authentication needed  -^> GitHub wants a token, not your password
+  echo   3^) remote is ahead        -^> run:   git pull --rebase
+  echo   then run this script again.
   goto :fail
 )
 
