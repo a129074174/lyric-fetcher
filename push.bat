@@ -44,16 +44,15 @@ for /f "delims=" %%i in ('git config user.email 2^>nul') do set "GMAIL=%%i"
 if "!GNAME!"=="" set "GNAME=local"
 if "!GMAIL!"=="" set "GMAIL=local@localhost"
 
-rem ---------- 3. remote ----------
+rem ---------- 3. remote (optional - we still commit locally) ----------
 
 set "REMOTE="
 for /f "delims=" %%i in ('git remote 2^>nul') do if not defined REMOTE set "REMOTE=%%i"
 if "!REMOTE!"=="" (
-  echo [FAILED] no git remote configured.
-  echo          run:  git remote add origin "URL_HERE"
-  goto :fail
+  echo [push] remote : ^(none^) - local commit only
+) else (
+  echo [push] remote : !REMOTE!
 )
-echo [push] remote : !REMOTE!
 
 rem ---------- 4. branch ----------
 
@@ -82,7 +81,18 @@ if not errorlevel 1 (
   )
 )
 
-rem ---------- 6. push ----------
+rem ---------- 6. push (skipped when no remote is configured) ----------
+
+if "!REMOTE!"=="" (
+  echo.
+  echo [WARN] no git remote configured - committed locally, nothing pushed.
+  echo        to enable push later, run:
+  echo          git remote add origin "URL_HERE"
+  echo.
+  echo [OK] local commit:
+  git --no-pager log -1 --oneline
+  goto :finish
+)
 
 git rev-parse --abbrev-ref --symbolic-full-name "@{u}" >nul 2>&1
 if errorlevel 1 (
@@ -104,6 +114,8 @@ if errorlevel 1 (
 echo.
 echo [OK] pushed to !REMOTE!/!BRANCH!
 git --no-pager log -1 --oneline
+
+:finish
 echo.
 if /i not "%NOPAUSE%"=="1" pause
 endlocal
