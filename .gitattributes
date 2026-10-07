@@ -1,0 +1,15 @@
+# 行尾统一：源码与非 Windows 脚本一律 LF
+# .bat 必须 CRLF，cmd.exe 对 LF 的批处理在 goto/label 上会出问题
+* text=auto eol=lf
+
+*.py   text eol=lf
+*.md   text eol=lf
+*.txt  text eol=lf
+*.toml text eol=lf
+*.cfg  text eol=lf
+*.ini  text eol=lf
+*.sh   text eol=lf
+*.lrc  text eol=lf
+
+*.bat  text eol=crlf
+*.cmd  text eol=crlf

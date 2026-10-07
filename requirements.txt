@@ -1,0 +1,3 @@
+httpx>=0.27
+zhconv>=1.4
+mutagen>=1.47
