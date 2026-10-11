@@ -22,7 +22,8 @@ class LrclibSource(LyricSource):
 
     name = "lrclib"
     display_name = "LRCLIB"
-    priority = 10
+    # 社区上传：同一首歌常有多条质量参差的重复条目，作为兜底源
+    priority = 30
 
     BASE = "https://lrclib.net/api"
 

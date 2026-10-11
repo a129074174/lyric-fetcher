@@ -32,6 +32,26 @@ class HttpError(RuntimeError):
     """所有网络层错误的统一出口，调用方只需捕获这一种。"""
 
 
+def _decode_json(response: httpx.Response) -> Any:
+    """把响应体解析成 JSON，兼容两类「头部撒谎」的接口。
+
+    1. content-type 说是 text/html、body 其实是 JSON（QQ 音乐歌词接口）。
+    2. content-type 说是 UTF-8、body 其实是 GBK 字节（QQ 音乐搜索接口）——
+       此时按 utf-8 解码会得到替换字符 U+FFFD，必须再按 GBK 兜一次。
+    所以这里直接对字节做解码，不依赖 httpx 按头部推断出的 encoding。
+    """
+    for encoding in ("utf-8", "gbk"):
+        try:
+            return json.loads(response.content.decode(encoding))
+        except (UnicodeDecodeError, ValueError):
+            continue
+
+    raise HttpError(
+        f"{response.url} 响应不是合法 JSON; "
+        f"content-type={response.headers.get('content-type')!r}"
+    )
+
+
 class HttpClient:
     """带 UA 伪装、指数退避重试的轻量 HTTP 客户端。"""
 
@@ -72,19 +92,16 @@ class HttpClient:
     def get(self, url: str, **kwargs: Any) -> httpx.Response:
         return self.request("GET", url, **kwargs)
 
+    def post(self, url: str, **kwargs: Any) -> httpx.Response:
+        return self.request("POST", url, **kwargs)
+
     def get_json(self, url: str, **kwargs: Any) -> Any:
-        """取 JSON；响应头 content-type 撒谎时，退回手动 json.loads。"""
-        response = self.get(url, **kwargs)
-        try:
-            return response.json()
-        except ValueError:
-            try:
-                return json.loads(response.text)
-            except ValueError as exc:
-                raise HttpError(
-                    f"{url} 响应不是合法 JSON: {exc}; "
-                    f"content-type={response.headers.get('content-type')!r}"
-                ) from exc
+        """取 JSON；响应头 content-type 撒谎时，退回手动解码。"""
+        return _decode_json(self.get(url, **kwargs))
+
+    def post_json(self, url: str, **kwargs: Any) -> Any:
+        """POST 取 JSON，解码策略与 get_json 一致。"""
+        return _decode_json(self.post(url, **kwargs))
 
     def close(self) -> None:
         self._client.close()
